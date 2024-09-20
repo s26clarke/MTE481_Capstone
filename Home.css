@@ -190,24 +190,49 @@
   .u-section-4 .u-text-2 {
     width: 720px;
   }
+
+  .u-section-4 .u-image-2 {
+    margin-top: 20px;
+  }
 }
 
 @media (max-width: 767px) {
   .u-section-4 .u-text-2 {
     width: 540px;
   }
+
+  .u-section-4 .u-btn-2 {
+    margin-top: 20px;
+  }
 }
 
 @media (max-width: 575px) {
+  .u-section-4 .u-sheet-1 {
+    min-height: 666px;
+  }
+
   .u-section-4 .u-text-2 {
     width: 340px;
   }
 
   .u-section-4 .u-image-1 {
-    margin-left: 50px;
+    margin-top: 84px;
+    margin-left: auto;
+  }
+
+  .u-section-4 .u-image-2 {
+    margin-top: 91px;
+    margin-right: auto;
   }
 
   .u-section-4 .u-btn-1 {
-    margin-left: 50px;
+    margin-top: -153px;
+    margin-left: auto;
+  }
+
+  .u-section-4 .u-btn-2 {
+    margin-top: 95px;
+    margin-right: auto;
+    margin-bottom: 30px;
   }
 }
