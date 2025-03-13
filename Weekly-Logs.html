@@ -24,6 +24,9 @@
     
     
     
+    
+    
+    
     <script type="application/ld+json">{
 		"@context": "http://schema.org",
 		"@type": "Organization",
@@ -71,12 +74,44 @@
         <h1 class="u-text u-text-default u-text-1">Group Weekly Logs</h1>
       </div>
     </section>
-    <section class="u-clearfix u-section-2" id="sec-8e5d">
+    <section class="u-clearfix u-section-2" id="sec-3273">
+      <div class="u-clearfix u-sheet u-valign-middle u-sheet-1">
+        <h2 class="u-text u-text-default u-text-1">MTE 482 - Development Log</h2>
+      </div>
+    </section>
+    <section class="u-clearfix u-section-3" id="sec-3095">
+      <div class="u-clearfix u-sheet u-sheet-1">
+        <p class="u-text u-text-default u-text-1">
+          <span style="font-weight: 700;">Servo: </span>
+          <br>- Wired up a servo to the board and testing that it worked by sending it PWM signals. <br>- Developed a routine for characterizing servos by alternating between the full angle range PWM signals. <br>- Created a sweep algorithm that moves servos in increments of 30° from 30° to 150°, for a total of 25 positions across the pitch and yaw servos. <br>- Up until now, visual inspection was used to approximate angles, but now a relatively precise test rig was created to measure the exact angles reached by the servos. <br>- Wrote code for servo communication between the mini PC and RP Pico. Servos can be moved by the mini PC by sending mutation messages to the RP Pico, which subsequently calculates and send the appropriate PWM signal to the servo. Servos were required to reach each position within 200ms of mini PC request initiation. <br>- The test rig was used to characterize both main servos to be used on the prototype, but were found to have specific unacceptable behaviours: <br>1. When given the reference PWM signals given in the specification, both servos failed to reach their required ranges: expected 0° to 120°, but reached roughly 136°. This may be partially caused by the fact that the specification expects 6V power, but we give it 7V. <br>2. "Warm up" seems to be required, where when alternating from 0° to 120°, the 0° end slowly drifts up to ~6° over the course of a couple of minutes and the 120° end drifts up to ~123­°. After a few minutes though, the drift stops, and both ends are reached within around ±1° to ±2°. <br>- Calculations give that at full distance (6m), to reach the required precision of 5cm for RBGD camera measurements, servo angles must be within around ±0.5° to ±1° of the target. Given the issues with drift, "warm up", and full range angle discrepancy, the servos that are currently in use are unlikely to work, so more precise servos are being considered. <br>- A more precise servo would put the system over the attachment weight limit for Skyport V1, so we are considering using only one servo for pitch, removing yaw control. <br>- A couple of more precise servos have been found, with one servo apparently reaching ±1° positions, but it is unlikely that this will be used, as this servo is quite expensive and would require a different mount. So, for the time being a static mount was printed with no servo connections, relying solely on drone motion. In the future, a singular servo may be used with hard stops, and a current sensor to stop powering the servo when it stalls (when the hard stop is reached). <br>
+          <br>
+          <span style="font-weight: 700;">Reconstruction: </span>
+          <br>
+          <br>- Researched the Open3D library, specifically on its pipeline and integration components, for performing point cloud reconstruction from multiple RGBD images correlated with global pose data. <br>- Performed some initial testing using scalable TSDF volumes using provided example datasets, such as SampleRedwoodRGBDImages (5 images), SampleFountainRGBDImages (33 images), LoungeRGBDImages (3000 images), and BedroomRGBDImages (~22000 images). See https://www.open3d.org/docs/release/index.html and https://www.open3d.org/docs/release/python_api/open3d.data.html for reference. In these tests, the base pipeline was brought up using  single TSDF volume object, which integrates all RBGD images with odometry data in one go, before converting to a point cloud and exporting. One issue of note that was found was memory usage. Smaller datasets were more than manageable with a single TSDF volume, but larger volumes resulted in a lot of RAM usage. Specifically, LoungeRGBDImages with its 3000 images peaked at around 12 to 14 GB of RAM used when all images were loaded into the TSDF volume. The BedroomRGBDImages dataset (with ~22000 images) slowly climbed until it reached ~80% RAM usage (~20 GB), before the system slowed to a halt, like due to the OS swapping memory to and from disk. This eventually caused the system to freeze and crash. For a large dataset with many images, a different method than using a single TSDF volume is required. <br>- A few methods were suggested for reducing RAM usage, and the chosen method is as follows. Segment the point cloud into blocks of 6m cubes (which corresponds to the maximum depth distance possible). These blocks are then subdivided into chunks of 1m or 2m. Only the current *block* that camera is located within is operated on, which is stored as a TSDF volume in RAM. Now, when the camera moves out of its current *chunk*, the block corresponding to its new position is computed. Any chunks that overlap between the current and new block remain in memory, while the others are loaded/unloaded as necessary. When unloaded, the current TSDF volume block is converted to a point cloud, and this point cloud is partitioned by chunks. Chunks that need to be unloaded are written as a point cloud to a file whose name is the coordinates of a corner of the chunk. When loading a chunk, the point cloud file is read from disk and re-integrated into the TSDF volume block. This reduces the RAM footprint reconstruction as only the immediate neighbourhood is stored in memory at any time. <br>- We found that this method could not be implemented, due to the fact that exporting a TSDF to a point cloud removes weight information for each image, and so when reading a point cloud file, it cannot be re-integrated into the TSDF volume. So, other methods were considered, such as using a separate TSDF volume for each chunk in a block, and writing/reading the TSDF object itself to/from a file (instead of converting to a point cloud), but it was found that this results in a lot of duplicate data, and that partitioning into chunks can only be performed on a point cloud, and not a TSDF volume. <br>- The final method we settled on was simply storing a TSDF volume with a rollover limit on how many images it can take. Once the limit has been reached, the TSDF volume is converted to a point cloud, is partitioned on each chunk, and the chunks are dumped to files. Then, whenever a chunk is to be dumped to file when a file already exists for that chunk, the file is loaded, and manual reconstruction is performed with ICP (iterative closest point) registration (see https://www.open3d.org/html/tutorial/pipelines/icp_registration.html). This reconstruction merges two point clouds, and the resulting point cloud is dumped back to the file. It is important to note however, that due to the lack of weighting data in point clouds, the reconstruction is somewhat less accurate than simply combining all images in a single TSDF volume. <br>- Parameters were then varied, such as the rollover limit, such that the dumped data could be rendered at roughly 5 fps. <br>
+          <br>
+          <br>
+          <span style="font-weight: 700;">Mechanical: </span>
+          <br>
+          <br>- Designed and engineered a modular housing box to securely contain onboard components, integrating attachable antenna mounts, a removable lid for accessibility, and precise Skyport mounting points for seamless drone integration. <br>- Conducted weight optimization to achieve a final net mass of 1.34 kg while maintaining structural integrity. <br>- 3D printed the housing using PLA, balancing print quality, strength, and weight. Employed M2/M3 screws for assembly, ensuring component stability while allowing for ease of disassembly and modification. <br>
+          <br>
+          <span style="font-weight: 700;">Interactive 3D Visualization Interface: </span>
+          <br>
+          <br>- Developed a web-based platform capable of dynamically loading and rendering PCD mesh files, allowing users to interact with and explore 3D models in semi-real time. Integrated VR support, enabling immersive visualization and navigation of the mesh environment. <br>- Uses HTTPS server and Flask backend to serve files in local directory <br>
+          <br>
+        </p>
+      </div>
+    </section>
+    <section class="u-clearfix u-section-4" id="carousel_015c">
+      <div class="u-clearfix u-sheet u-valign-middle u-sheet-1">
+        <h2 class="u-text u-text-default u-text-1">MTE 481 - Development Log</h2>
+      </div>
+    </section>
+    <section class="u-clearfix u-section-5" id="sec-8e5d">
       <div class="u-clearfix u-sheet u-sheet-1">
         <p class="u-text u-text-default u-text-1">The following section details the weekly logs from each member of the team.</p>
       </div>
     </section>
-    <section class="u-clearfix u-section-3" id="sec-93d8">
+    <section class="u-clearfix u-section-6" id="sec-93d8">
       <div class="u-clearfix u-sheet u-sheet-1">
         <p class="u-text u-text-1">
           <span style="font-weight: 700;"> 09/09/24</span>
@@ -335,23 +370,23 @@ with selected components are develope<br>
         </p>
       </div>
     </section>
-    <section class="u-clearfix u-section-4" id="sec-2507">
+    <section class="u-clearfix u-section-7" id="sec-2507">
       <div class="u-clearfix u-sheet u-valign-middle u-sheet-1">
         <img class="u-image u-image-default u-image-1" src="images/image5.png" alt="" data-image-width="533" data-image-height="236">
       </div>
     </section>
-    <section class="u-clearfix u-section-5" id="sec-c129">
+    <section class="u-clearfix u-section-8" id="sec-c129">
       <div class="u-clearfix u-sheet u-sheet-1">
         <p class="u-text u-text-default u-text-1">Internal component
 placement was selected to fit within a 200mm by 200mm build plate&nbsp;(for 3D printing)&nbsp;</p>
       </div>
     </section>
-    <section class="u-clearfix u-section-6" id="sec-407b">
+    <section class="u-clearfix u-section-9" id="sec-407b">
       <div class="u-clearfix u-sheet u-valign-bottom u-sheet-1">
         <img class="u-image u-image-contain u-image-default u-image-1" src="images/image6.png" alt="" data-image-width="600" data-image-height="311">
       </div>
     </section>
-    <section class="u-clearfix u-section-7" id="sec-e54c">
+    <section class="u-clearfix u-section-10" id="sec-e54c">
       <div class="u-clearfix u-sheet u-sheet-1">
         <p class="u-text u-text-default u-text-1"> Hand calculations were performed
 for gimbal design to validate operation in moderate conditions.
@@ -361,12 +396,12 @@ have been developed. Wires were routed internally, and we were able to reuse
 and assembled for early stage prototyping.&nbsp;&nbsp;</p>
       </div>
     </section>
-    <section class="u-clearfix u-section-8" id="sec-c970">
+    <section class="u-clearfix u-section-11" id="sec-c970">
       <div class="u-clearfix u-sheet u-sheet-1">
         <img class="u-image u-image-contain u-image-default u-preserve-proportions u-image-1" src="images/image3.png" alt="" data-image-width="244" data-image-height="225">
       </div>
     </section>
-    <section class="u-clearfix u-section-9" id="carousel_bd77">
+    <section class="u-clearfix u-section-12" id="carousel_bd77">
       <div class="u-clearfix u-sheet u-sheet-1">
         <p class="u-text u-text-1">
           <span style="font-weight: 700;"></span>
@@ -382,12 +417,12 @@ ground.<br>
         </p>
       </div>
     </section>
-    <section class="u-clearfix u-section-10" id="sec-7d61">
+    <section class="u-clearfix u-section-13" id="sec-7d61">
       <div class="u-clearfix u-sheet u-sheet-1">
         <img class="u-expanded-height u-image u-image-contain u-image-default u-image-1" src="images/image4.png" alt="" data-image-width="225" data-image-height="310">
       </div>
     </section>
-    <section class="u-clearfix u-section-11" id="sec-f47a">
+    <section class="u-clearfix u-section-14" id="sec-f47a">
       <div class="u-clearfix u-sheet u-sheet-1">
         <p class="u-text u-text-default u-text-1">Started work on the WebRTC
 protocol stack required to transport video data off the drone for processing.
